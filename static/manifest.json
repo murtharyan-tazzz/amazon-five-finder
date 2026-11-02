@@ -1,0 +1,10 @@
+{
+  "name": "Amazon Five Finder",
+  "short_name": "Five Finder",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#101827",
+  "theme_color": "#101827",
+  "description": "Search Amazon and compare five product matches.",
+  "icons": []
+}

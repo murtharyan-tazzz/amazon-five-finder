@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<link rel="manifest" href="/manifest.json">
+<title>Amazon Five Finder</title>
+<style>
+:root{color-scheme:dark;--bg:#101827;--panel:#192538;--muted:#aab7c9;--line:#304158;--accent:#77d2b0}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#101827,#17243a);color:#f4f7fb;font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:760px;margin:auto;padding:22px 16px 50px}.brand{font-size:13px;letter-spacing:.13em;color:var(--accent);font-weight:800}
+h1{font-size:30px;line-height:1.12;margin:8px 0}.sub{color:var(--muted);line-height:1.5;margin:0 0 22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:16px 0}
+label{display:block;font-weight:650;margin:0 0 8px}input[type=text],input[type=number]{width:100%;background:#0d1726;color:white;border:1px solid #43546c;border-radius:12px;padding:14px;font:inherit;margin-bottom:14px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.check{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:14px;margin:2px 0 14px}.check input{width:18px;height:18px}
+button{width:100%;border:0;border-radius:12px;background:var(--accent);color:#102019;font-weight:800;font-size:16px;padding:15px;cursor:pointer}
+button:disabled{opacity:.6}.hint{color:var(--muted);font-size:12px;line-height:1.5;margin-top:12px}
+#status{white-space:pre-wrap;color:#f4d69b;margin:12px 2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0;display:grid;grid-template-columns:104px 1fr;gap:14px}
+.card img{width:104px;height:116px;object-fit:contain;background:#fff;border-radius:10px}
+.rank{color:var(--accent);font-weight:800;font-size:13px}.name{font-weight:750;line-height:1.35;margin:4px 0 8px}
+.meta{color:var(--muted);font-size:13px;line-height:1.55}.price{font-size:20px;font-weight:800;margin:5px 0}
+a{color:#8edfc2;text-decoration:none}a:hover{text-decoration:underline}
+.details{grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;color:#d5deea;font-size:13px;line-height:1.55}
+details summary{cursor:pointer;color:var(--accent);font-weight:700}.disclaimer{font-size:12px;color:var(--muted);line-height:1.5}
+@media(max-width:430px){.row{grid-template-columns:1fr}.card{grid-template-columns:82px 1fr;gap:11px;padding:11px}.card img{width:82px;height:100px}h1{font-size:27px}}
+</style>
+</head>
+<body><main>
+<div class="brand">PRODUCT RESEARCH</div>
+<h1>Amazon Five Finder</h1>
+<p class="sub">Search Amazon, compare the strongest matches, and see what the listing data actually says.</p>
+<section class="panel">
+<form id="searchForm">
+<label for="query">What are you looking for?</label>
+<input id="query" type="text" maxlength="180" placeholder="Example: accurate digital hygrometer under $50" required>
+<div class="row">
+<div><label for="maxPrice">Maximum price ($)</label><input id="maxPrice" type="number" min="0" step="0.01" placeholder="No limit"></div>
+<div><label for="sortInfo">Results</label><input id="sortInfo" type="text" value="Top 5 matches" disabled></div>
+</div>
+<label class="check"><input id="details" type="checkbox" checked> Fetch extra product specifications (uses additional API searches)</label>
+<button id="go" type="submit">Search Amazon</button>
+</form>
+<div class="hint">Your API key stays on the server; it is never sent to the browser.</div>
+</section>
+<div id="status" role="status"></div>
+<section id="results"></section>
+<p class="disclaimer">Prices, availability, ratings, and review counts can change. Data is supplied by the configured search provider and may not include every Amazon listing or every customer review. Rankings are screening estimates—not guarantees or independent product testing. Check the Amazon listing before buying.</p>
+</main>
+<script>
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+const form=document.getElementById("searchForm"), statusBox=document.getElementById("status"), results=document.getElementById("results"), go=document.getElementById("go");
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+form.addEventListener("submit",async e=>{
+ e.preventDefault();results.innerHTML="";statusBox.textContent="Searching Amazon and comparing matches…";go.disabled=true;go.textContent="Searching…";
+ try{
+  const res=await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+   query:document.getElementById("query").value,
+   max_price:document.getElementById("maxPrice").value,
+   include_details:document.getElementById("details").checked
+  })});
+  const data=await res.json();if(!res.ok)throw new Error(data.error||"Search failed.");
+  statusBox.textContent=`Found ${data.candidate_count} eligible matches. Showing ${data.count_returned}.\n${data.ranking_note}`;
+  if(!data.products.length){results.innerHTML="<div class='panel'>No matching listings were returned. Try a broader search or remove the price limit.</div>";return;}
+  results.innerHTML=data.products.map((p,i)=>{
+   const features=Array.isArray(p.features)?p.features:[];
+   const specs=p.specifications&&typeof p.specifications==="object"?Object.entries(p.specifications):[];
+   const reviews=Array.isArray(p.review_highlights)?p.review_highlights:[];
+   const extra=[
+    p.brand?`<p><b>Brand:</b> ${esc(p.brand)}</p>`:"",
+    p.description?`<p>${esc(p.description)}</p>`:"",
+    features.length?`<b>Features</b><ul>${features.slice(0,8).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"",
+    specs.length?`<b>Specifications</b><ul>${specs.slice(0,12).map(([k,v])=>`<li><b>${esc(k)}:</b> ${esc(v)}</li>`).join("")}</ul>`:"",
+    reviews.length?`<b>Review data returned</b><pre>${esc(JSON.stringify(reviews.slice(0,5),null,2))}</pre>`:"",
+    p.detail_error?`<p>Extra details unavailable: ${esc(p.detail_error)}</p>`:""
+   ].join("");
+   return `<article class="card">
+    ${p.image?`<img src="${esc(p.image)}" alt="" loading="lazy">`:""}
+    <div><div class="rank">#${i+1} · MATCH SCORE ${esc(p.score)}</div>
+    <div class="name">${esc(p.title)}</div>
+    <div class="price">${esc(p.price||"Price unavailable")}</div>
+    <div class="meta">⭐ ${esc(p.rating??"No rating")} · ${esc(p.review_count??"No")} reviews<br>${p.bought_last_month?esc(p.bought_last_month)+"<br>":""}${p.sponsored?"Sponsored listing · ":""}ASIN: ${esc(p.asin)}</div>
+    <p><a href="${esc(p.link)}" target="_blank" rel="noopener">Open product on Amazon ↗</a></p></div>
+    <div class="details"><details><summary>Product information and ranking details</summary>
+    <p>${esc(p.score_note)}</p>${extra||"<p>No additional specifications or review excerpts were returned for this listing.</p>"}
+    </details></div></article>`;
+  }).join("");
+ }catch(err){statusBox.textContent="Could not complete search: "+err.message;}
+ finally{go.disabled=false;go.textContent="Search Amazon";}
+});
+</script>
+</body></html>
