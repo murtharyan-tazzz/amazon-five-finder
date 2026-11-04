@@ -1,4 +1,4 @@
-# Amazon Five Finder — Android-friendly web app
+# Ryan's Great List — Android-friendly web app
 
 This project creates a small installable web app. Open it in Chrome on Android and use **Add to Home screen** to get an app-like icon.
 
